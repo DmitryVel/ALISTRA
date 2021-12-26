@@ -33,11 +33,11 @@ monocle_theme_opts <- function()
 #' @export
 combine_lineages <- function(cds, start){
 lineage = names(cds@lineages)[1]
-input = paste0("principal_graph(cds@lineages$", lineage,")[['UMAP']]")
+input = paste0("cds@graphs$", lineage)
 for(lineage in names(cds@lineages)[2:length(names(cds@lineages))]){
-input = paste0(input,",principal_graph(cds@lineages$", lineage,")[['UMAP']]")
+input = paste0(input,",cds@graphs$", lineage)
 }
-input = paste0("union(", input, ")")
+input = paste0("igraph::union(", input, ")")
 g = eval(parse(text=input))
 nodes_UMAP = cds@principal_graph_aux[["UMAP"]]$dp_mst
 principal_graph(cds)[["UMAP"]] <- g
@@ -48,7 +48,7 @@ closest_vertex = as.data.frame(closest_vertex)
 cds@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex <- closest_vertex
 source_url("https://raw.githubusercontent.com/cole-trapnell-lab/monocle3/master/R/learn_graph.R")
 cds <- project2MST(cds, project_point_to_line_segment, F, T, "UMAP", nodes_UMAP[,names(V(g))])
-cds <- order_cells(cds, root_pr_nodes = as.character(start))
+cds <- order_cells(cds, root_pr_nodes = as.character(paste0("Y_",start)))
 return(cds)
 }
 
@@ -135,13 +135,12 @@ included <- function(graph, include_nodes){
 all(include_nodes %in% names(graph))
 }
 
-#' @export
-isolate_graph <- function(cds, start, end, lineage, include_nodes = F){
+isolate_graph_sub <- function(cds, start, end, lineage, include_nodes = F){
 #get lineage graph
 reduction_method = "UMAP"
 graph = cds@principal_graph[[reduction_method]]
 #select cells that are 1) progenitor cells from the region of interest (MGE, CGE) or 2) lineage-committed cells
-sub.graph = all_simple_paths(graph, start, end)
+sub.graph = all_simple_paths(graph, paste0("Y_", start), paste0("Y_", end))
 if(include_nodes != F){
 sub.graph = sub.graph[sapply(sub.graph, included, include_nodes = include_nodes)]
 }
@@ -149,13 +148,48 @@ lengths = lengths(sub.graph)
 #get the shortest path
 n = which(lengths==min(lengths))[1]
 sub.graph = sub.graph[[n]]
+}
+
+#' @export
+isolate_fork <- function(cds, start, end1, end2, name, include_nodes = F){
+graph1 = isolate_graph(cds, start, end1, paste0(name, "_fork_1"), include_nodes = include_nodes)
+graph2 = isolate_graph(cds, start, end2, paste0(name, "_fork_1"), include_nodes = include_nodes)
+}
+
+#' @export
+isolate_graph <- function(cds, start, end, lineage, include_nodes = F){
+#get lineage graph
+sub.graph = isolate_graph_sub(cds, start, end, lineage, include_nodes = F)
 input = paste0("cds@graphs$", lineage, " <- make_graph(sub.graph)")
 eval(parse(text=input))
 return(cds)
 }
 
-#' @export
-isolate_lineage <- function(cds, lineage, sel_clusters = F, start_regions = F, starting_clusters = F, subset = FALSE, N = 5, cl = 1){
+get_lineage_object <- function(cds, lineage, start)
+{
+input = paste0("sub.graph = cds@graphs$", lineage)
+eval(parse(text=input))
+input = paste0("sel.cells = cds@lineages$", lineage)
+eval(parse(text=input))
+nodes_UMAP = cds@principal_graph_aux[["UMAP"]]$dp_mst
+#subset the moncole object
+cds_subset = cds[,sel.cells]
+#set the graph, node and cell UMAP coordinates
+principal_graph(cds_subset)[["UMAP"]] <- sub.graph
+cds_subset@principal_graph_aux[["UMAP"]]$dp_mst <- nodes_UMAP[,names(V(sub.graph))]
+cds_subset@clusters[["UMAP"]]$partitions <- cds_subset@clusters[["UMAP"]]$partitions[colnames(cds_subset)]
+#recalculate closest vertex for the selected cells
+cells_UMAP = as.data.frame(reducedDims(cds_subset)["UMAP"])
+closest_vertex = apply(cells_UMAP[,c("UMAP_1", "UMAP_2")], 1, calculate_closest_vertex, nodes = as.matrix(nodes_UMAP[,names(V(sub.graph))]))
+closest_vertex = as.data.frame(closest_vertex)
+cds_subset@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex <- closest_vertex
+source_url("https://raw.githubusercontent.com/cole-trapnell-lab/monocle3/master/R/learn_graph.R")
+cds_subset <- project2MST(cds_subset, project_point_to_line_segment, F, T, "UMAP", nodes_UMAP[,names(V(sub.graph))])
+cds_subset <- order_cells(cds_subset, root_pr_nodes = c(paste0("Y_", as.character(start))))
+return(cds_subset)
+}
+
+isolate_lineage_sub <- function(cds, lineage, sel_clusters = F, start_regions = F, starting_clusters = F, subset = FALSE, N = 5, cl = 1){
 input = paste0("sub.graph = cds@graphs$", lineage)
 eval(parse(text=input))
 nodes_UMAP = cds@principal_graph_aux[["UMAP"]]$dp_mst
@@ -192,21 +226,39 @@ sel.cells2 = names(cds@"clusters"[["UMAP"]]$clusters[cds@"clusters"[["UMAP"]]$cl
 }
 cells = unique(c(sel.cells1, sel.cells2))
 sel.cells = sel.cells[sel.cells %in% cells]
-#subset the moncole object
-cds_subset = cds[,sel.cells]
-#set the graph, node and cell UMAP coordinates
-principal_graph(cds_subset)[["UMAP"]] <- sub.graph
-cds_subset@principal_graph_aux[["UMAP"]]$dp_mst <- nodes_UMAP[,names(V(sub.graph))]
-cds_subset@clusters[["UMAP"]]$partitions <- cds_subset@clusters[["UMAP"]]$partitions[colnames(cds_subset)]
-#recalculate closest vertex for the selected cells
-cells_UMAP = as.data.frame(reducedDims(cds_subset)["UMAP"])
-closest_vertex = apply(cells_UMAP[,c("UMAP_1", "UMAP_2")], 1, calculate_closest_vertex, nodes = as.matrix(nodes_UMAP[,names(V(sub.graph))]))
-closest_vertex = as.data.frame(closest_vertex)
-cds_subset@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex <- closest_vertex
-source_url("https://raw.githubusercontent.com/cole-trapnell-lab/monocle3/master/R/learn_graph.R")
-cds_subset <- project2MST(cds_subset, project_point_to_line_segment, F, T, "UMAP", nodes_UMAP[,names(V(sub.graph))])
-cds_subset <- order_cells(cds_subset, root_pr_nodes = c(paste0("Y_", as.character(start))))
-input = paste0("cds@lineages$", lineage, " <- cds_subset")
+return(sel.cells)
+}
+
+#' @export
+isolate_lineage <- function(cds, lineage, sel_clusters = F, start_regions = F, starting_clusters = F, subset = FALSE, N = 5, cl = 1){
+isolate_lineage_sub(cds, lineage, sel_clusters = sel_clusters, start_regions = start_regions, starting_clusters = starting_clusters, subset = subset, N = N, cl = cl)
+input = paste0("cds@lineages$", lineage, " <- sel.cells")
+eval(parse(text=input))
+return(cds)
+}
+
+#' @export
+isolate_fork <- function(cds, start, end1, end2, lineage, include_nodes = F, sel_clusters = F, start_regions = F, starting_clusters = F, subset = FALSE, N = 5, cl = 1){
+#get lineage graphs
+graph1 = isolate_graph_sub(cds, start, end1, paste0(lineage, "_1"), include_nodes = include_nodes)
+graph1 = make_graph(graph1)
+input = paste0("cds@graphs$", paste0(lineage, "_1"), " <- graph1")
+eval(parse(text=input))
+graph2 = isolate_graph_sub(cds, start, end2, paste0(lineage, "_2"), include_nodes = include_nodes)
+graph2 = make_graph(graph2)
+input = paste0("cds@graphs$", paste0(lineage, "_2"), " <- graph2")
+eval(parse(text=input))
+graph = igraph::union(graph1, graph2)
+input = paste0("cds@graphs$", lineage, " <- graph")
+eval(parse(text=input))
+cells1 = isolate_lineage_sub(cds, paste0(lineage, "_1"), sel_clusters = sel_clusters, start_regions = start_regions, starting_clusters = starting_clusters, subset = subset, N = N, cl = cl)
+input = paste0("cds@lineages$", paste0(lineage, "_1"), " <- cells1")
+eval(parse(text=input))
+cells2 = isolate_lineage_sub(cds, paste0(lineage, "_2"), sel_clusters = sel_clusters, start_regions = start_regions, starting_clusters = starting_clusters, subset = subset, N = N, cl = cl)
+input = paste0("cds@lineages$", paste0(lineage, "_2"), " <- cells2")
+eval(parse(text=input))
+cells = unique(c(cells1, cells2))
+input = paste0("cds@lineages$", lineage, " <- cells")
 eval(parse(text=input))
 return(cds)
 }
