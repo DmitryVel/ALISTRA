@@ -347,7 +347,7 @@ return(pt)
 }
 
 #' @export
-plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scale = T, text.size = 14, plot.title.size = 36, legend.key.size = 0.5, legend.text.size = 10, colors = c("red", "blue", "green", "cyan", "magenta", "purple", "orange", "black", "yellow", "tan"), N = 500, legend_position = "none"){
+plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scale = T, point_size = 0.1, line_size = 1, text.size = 14, plot.title.size = 36, legend.key.size = 0.5, legend.text.size = 10, colors = c("red", "blue", "green", "cyan", "magenta", "purple", "orange", "black", "yellow", "tan"), N = 500, legend_position = "none"){
   cds_name = deparse(substitute(cds))
   input = paste0(cds_name,"@expression$", lineages[1])
   N = nrow(eval(parse(text = input)))
@@ -412,15 +412,15 @@ plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scal
   q <- ggplot(data = dd)
   if(points == T){
     for(N in 1:length(lineages)){
-      loop_input1 = paste0("geom_point(aes_string(x='pseudotime',y = '", paste0('exp_', lineages[N]), "',color='pseudotime'), size=I(0.2))")
+      loop_input1 = paste0("geom_point(aes_string(x='pseudotime',y = '", paste0('exp_', lineages[N]), "',color='pseudotime'), size=I(", point_size, "))")
       loop_input2 = paste0("scale_color_gradient2(lineages[N],low='grey', ", "high='",colors[N],"')")
       loop_input3 = "new_scale_color()"
-      loop_input4 = paste0("geom_line(aes_string(x='pseudotime', y = '", paste0('fit_', lineages[N]), "',size = I(1.2)), color = '", colors[N],"')")
+      loop_input4 = paste0("geom_line(aes_string(x='pseudotime', y = '", paste0('fit_', lineages[N]), "',size = I(", line_size, ")), color = '", colors[N],"')")
       q <- q + eval(parse(text=loop_input1)) + eval(parse(text=loop_input2)) + eval(parse(text=loop_input3)) + eval(parse(text=loop_input4))
     }
   }
   else{
-    q <- q + geom_line(aes(x = pseudotime, y = fit, color = lineage), size = I(1.2)) + scale_color_manual(values = colors)
+    q <- q + geom_line(aes(x = pseudotime, y = fit, color = lineage), size = I(line_size)) + scale_color_manual(values = colors)
   }
   age = meta[,c("age_num", "age_range")]
   age = age[order(age$age_num),]
