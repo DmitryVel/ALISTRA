@@ -21,7 +21,7 @@ get_max_age_v2 <- function(cds, meta, genes = NULL, lineage, start){
 }
 
 #' @export
-phase_sub_v2 <- function(gene, fit, age, age.comp, factor = 0.2, factor2 = 0.4){
+phase_sub_v2 <- function(gene, fit, age, age.comp, factor = 0.2, factor2 = 0.2){
   age_max = get_max_age_sub(gene, fit, age, age.comp)
   age_mid = get_max_age_sub(gene, fit, age, age.comp, age_factor = 0.5)
   fit = fit[,gene]
@@ -29,67 +29,101 @@ phase_sub_v2 <- function(gene, fit, age, age.comp, factor = 0.2, factor2 = 0.4){
   locmin = which(locmin == TRUE)
   locmax = rollapply(fit, 3, function(x) which.max(x)==2)
   locmax = which(locmax == TRUE)
+  class = c()
   if(min(which(fit == max(fit))) < min(which(fit == min(fit)))){
     direction = "descrease"
   }
   else{
     direction = "increase"
   }
-  mode = "unclassified"
-  if(length(locmin) == 1 & length(locmax) == 1){
-  if(length(locmax) > 0){
-    if(length(locmin) > 0){
-      if(abs(fit[locmax]-fit[length(fit)])/fit[locmax] < factor){
-        mode = "plateau"
-      }
-      if(locmax<locmin & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2){
-        mode = "burst"
-      }
-      if(locmin>locmax & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2 & (fit[locmax] - fit[locmin])/max(fit) > factor2){
-        mode = "biphasic"
-      }
-      if(locmin>locmax & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2 & (fit[locmax]-min(fit[1:locmax]))/max(fit) > factor2){
-          mode = "biphasic"
-      }
-      if(locmin<locmax & (max(fit[1:locmin]) - fit[locmin])/max(fit) > factor2 & (max(fit) - fit[locmin])/max(fit) > factor2){
-        mode = "biphasic"
-      }
-      if(length(locmin) > 0 & (max(fit)-fit[locmax])/max(fit) < 0.05 & (max(fit) - fit[1]) > (max(fit)*factor2) & (max(fit) - fit[length(fit)]) > (max(fit)*factor2)){
-        mode = "transient"
-      }
+  #one local min and one local max
+  if(length(locmin) == 1 & length(locmax) == 1 & length(locmin) > 0){
+  #plateau classification
+    if(abs(fit[locmax]-fit[length(fit)])/fit[locmax] < factor){
+      mode = "plateau"
+      class = append(class, mode)
     }
-    else if(length(locmin) == 0 & (max(fit)-fit[locmax])/max(fit) < 0.05 & (max(fit) - fit[1]) > (max(fit)*factor2) & (max(fit) - fit[length(fit)]) > (max(fit)*factor2)){
-      mode = "transient"
+  #biphasic 1 classification
+    if(locmin<locmax & (max(fit[1:locmin]) - fit[locmin])/max(fit) > factor2 & (max(fit) - fit[locmin])/max(fit) > factor2){
+      mode = "biphasic"
+      class = append(class, mode)
     }
-    else if(abs(fit[locmax]-fit[length(fit)])/fit[locmax] < factor){
-      mode = "plateau" 
+  #biphasic 2 classification
+    if(locmin>locmax & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2 & (fit[locmax] - fit[locmin])/max(fit) > factor2){
+      mode = "biphasic"
+      class = append(class, mode)
+    }
+  #biphasic 3 classification
+    if(locmin>locmax & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2 & (fit[locmax]-min(fit[1:locmax]))/max(fit) > factor2){
+      mode = "biphasic"
+      class = append(class, mode)
+    }
+  #burst classification
+    if(locmax<locmin & (max(fit[locmin:length(fit)]) - fit[locmin])/max(fit) > factor2){
+      mode = "burst"
+      class = append(class, mode)
     }
   }
-  else{
-    if(length(locmin) > 0){
-      if((fit[length(fit)-fit[locmin]])/fit[locmin] > factor2){
-        mode = "burst"
-      }
-      if((max(fit[1:locmin]) - fit[locmin])/max(fit) > factor2 & (fit[length(fit)] - fit[locmin])/max(fit) > factor2){
-        mode = "biphasic"
-      }
+  #transient classification
+  if((max(fit) - fit[1]) > (max(fit)*factor2) & (max(fit) - fit[length(fit)]) > (max(fit)*factor2)){
+    mode = "transient"
+    class = append(class, mode)
+  }
+  #no localmin
+  if(length(locmin) == 0){
+    change1 = abs((fit[as.integer(length(fit))/2] - fit[1]))
+    change2 = abs((fit[length(fit)] - fit[as.integer(length(fit))/2]))
+    if(change1/change2 > factor2){
+      mode = "steady"
+      class = append(class, mode)
     }
-    if(length(locmin) == 0){
-      change1 = abs((fit[as.integer(length(fit))/2] - fit[1]))
-      change2 = abs((fit[length(fit)] - fit[as.integer(length(fit))/2]))
-      if(change1/change2 > factor2)
-        mode = "steady"
-      else{
-        mode = "burst"
-          }
+    else{
+      mode = "burst"
+      class = append(class, mode)
     }
   }
-  if(direction == "descrease"){
-    if(mode == "burst" | mode == "steady")
-      mode = "drop"
-  }
+  #at least one localmin
+  if(length(locmin) > 0){
+    #burst classification
+    if((fit[length(fit)-fit[locmin]])/fit[locmin] > factor2){
+      mode = "burst"
+      class = append(class, mode)
     }
-  c(age_max, age_mid, mode, direction)
+  }
+  final_class = "unclassified"
+  class = unique(class)
+  if("plateau" %in% class){
+    final_class = "plateau"
+  }
+  if("transient" %in% class){
+    final_class = "transient"
+  }
+  if("biphasic" %in% class){
+    final_class = "biphasic"
+  }
+  if(length(class) == 1){
+    if(class == "burst" & direction == "descrease"){
+      final_class = "drop"
+    }
+    if(class == "burst" & direction == "increase"){
+      final_class = "burst"
+    }
+    if(class == "steady"){
+      final_class = "steady"
+    }
+    if(class == "plateau"){
+      final_class = "plateau"
+    }
+    if("biphasic" %in% class){
+      final_class = "biphasic"
+    }
+    if("transient" %in% class){
+      final_class = "transient"
+    }
+    }
+  res = c(final_class,age_mid,age_max,direction)
+  names(res) <- c("pattern", "age_mid", "age_max", "direction")
+  res
 }
                      
 #' @export
