@@ -27,8 +27,14 @@ phase_sub_v2 <- function(gene, fit, age, age.comp, factor = 0.2, factor2 = 0.2){
   fit = fit[,gene]
   locmin = rollapply(fit, 3, function(x) which.min(x)==2)
   locmin = which(locmin == TRUE)
+  if(length(locmin)>1){
+  locmin = locmin[1]
+  }
   locmax = rollapply(fit, 3, function(x) which.max(x)==2)
   locmax = which(locmax == TRUE)
+  if(length(locmax)>1){
+    locmax = locmax[1]
+  }
   class = c()
   if(min(which(fit == max(fit))) < min(which(fit == min(fit)))){
     direction = "descrease"
