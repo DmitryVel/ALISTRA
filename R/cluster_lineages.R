@@ -134,17 +134,19 @@ phase_sub_v2 <- function(gene, fit, age, age.comp, factor = 0.2, factor2 = 0.2){
                      
 #' @export
 format_lineage_out <- function(lineages){
-  out = matrix(nrow = 0, ncol = 7,) 
+  out = matrix(nrow = 0, ncol = 8,) 
   for(lineage in lineages){
     spec = read.data(paste0(lineage, "_spec.txt"))
     class = read.data(paste0("mod_", lineage, ".txt"))
-    res = cbind(spec, class)
+    moran = read.data(paste0("pt_DGE_", lineage, ".txt"))
+    moran = moran[rownames(res),]
+    res = cbind(spec, class, moran[,4])
     names = paste0(rownames(res), "_", lineage)
     res$gene <- rownames(res)
     rownames(res) <- names
     out = rbind(out, res)
   }
-  colnames(out) <- c("diff", "lineage", "pattern", "age_mid", "age_max", "direction", "gene")
+  colnames(out) <- c("diff", "lineage", "pattern", "age_mid", "age_max", "direction", "I", "gene")
   out
 }
 
