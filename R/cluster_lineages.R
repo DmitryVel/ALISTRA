@@ -139,7 +139,7 @@ format_lineage_out <- function(lineages){
     spec = read.data(paste0(lineage, "_spec.txt"))
     class = read.data(paste0("mod_", lineage, ".txt"))
     moran = read.data(paste0("pt_DGE_", lineage, ".txt"))
-    moran = moran[rownames(res),]
+    moran = moran[rownames(spec),]
     res = cbind(spec, class, moran[,4])
     names = paste0(rownames(res), "_", lineage)
     res$gene <- rownames(res)
