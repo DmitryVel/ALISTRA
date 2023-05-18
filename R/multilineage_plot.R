@@ -352,7 +352,7 @@ plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scal
   input = paste0(cds_name,"@expression$", lineages[1])
   N = nrow(eval(parse(text = input)))
   pts = c()
-  if(scale.lineage == NULL){
+  if(length(scale.lineage) == 0){
   for(lineage in lineages){
     input = paste0(cds_name,"@pseudotime$", lineage)
     pt = eval(parse(text = input))[,1]
@@ -429,10 +429,17 @@ plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scal
   else{
     q <- q + geom_line(aes(x = pseudotime, y = fit, color = lineage), size = I(line_size)) + scale_color_manual(values = colors)
   }
+  if(length(scale.lineage) == 1){
+  input = paste0(cds_name,"@lineages$", scale.lineage)
+  cells = eval(parse(text = input))
+  age = meta[cells,c("age_num", "age_range")]
+  }
+  else{
   age = meta[,c("age_num", "age_range")]
+  }
   age = age[order(age$age_num),]
-  window = nrow(meta)/N
-  step = ((nrow(meta)-window)/N)
+  window = nrow(age)/N
+  step = ((nrow(age)-window)/N)
   age.comp = SlidingWindow("mean", age$age_num, window, step)
   d = seq(from=0, to=max.pt, by = max.pt/(N-1))
   d = cbind(as.data.frame(d), age.comp)
