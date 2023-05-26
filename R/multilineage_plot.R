@@ -125,16 +125,18 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   }
   pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
   pt = pt[order(pt)]
-  exp = exp[names(pt),]
   if(window == FALSE){
     if(normalize == T){
+      exp = exp[names(pt),]
       window = nrow(exp)/N
+      step = ((nrow(exp)-window)/N)
     }
     else{
+      exp = exp[,names(pt)]
       window = ncol(exp)/N
+      step = ((ncol(exp)-window)/N)
     }
   }
-  step = ((nrow(exp)-window)/N)
   #use sliding window to compress expression values and pseudotime
   print(paste0("Window: ", window))
   print(paste0("Step: ", step))
@@ -151,8 +153,8 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
     }
     else{
       step = ((ncol(exp)-window)/N)
-      if(cores != F){
-        cl <- makeCluster(cores)
+      if(cores > 1){
+        print("multicore processing")
         exp.comp = pbapply(exp, 1, compress2, window = window, step = step, cl = cl)
       }
       else{
