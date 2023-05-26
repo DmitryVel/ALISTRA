@@ -78,11 +78,11 @@ compress2 <- function(df, window, step){
   df.comp = SlidingWindow("mean", df, window, step)
 }
 
-compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F, normalize = T){
+compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F){
   lineages = names(cds@lineages)
   for(lineage in lineages){
     print(lineage)
-    cds = compress_lineage_v2(cds, lineage = lineage, start = start, window = window, gene = FALSE, N = N, cores = cores, normalize = normalize)
+    cds = compress_lineage_v2(cds, lineage = lineage, start = start, window = window, gene = FALSE, N = N, cores = cores)
     gc()
   }
   return(cds)
@@ -92,10 +92,10 @@ compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F, nor
 compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE, normalize = T){
   cds_name = deparse(substitute(cds))
   if(gene == FALSE){
-    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, ", normalize = ", normalize, ", cores = ", cores, ")")
+    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, ", cores = ", cores, ")")
   }
   else{
-    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = '", gene, "', N = ", N, ", normalize = ", normalize, ", cores = ", cores, ")")
+    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = '", gene, "', N = ", N, ", cores = ", cores, ")")
   }
   exp = eval(parse(text=input))
   input = paste0(cds_name, "@expression$", lineage, " <- exp$expression")
@@ -108,7 +108,7 @@ compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N
 }
 
 #' @export
-compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, normalize = T){
+compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F){
   cds_name = deparse(substitute(cds))
   if(cores != F){
     cl <- makeCluster(cores)
@@ -120,23 +120,14 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   model = "expression ~ splines::ns(pseudotime, df=3)"
   names(cds_subset) <- rowData(cds_subset)$gene_short_name
   exp = as_matrix(exprs(cds_subset))
-  if(normalize == T){
-    exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
-  }
+  exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
   pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
   pt = pt[order(pt)]
+  exp = exp[names(pt),]
   if(window == FALSE){
-    if(normalize == T){
-      exp = exp[names(pt),]
       window = nrow(exp)/N
-      step = ((nrow(exp)-window)/N)
-    }
-    else{
-      exp = exp[,names(pt)]
-      window = ncol(exp)/N
-      step = ((ncol(exp)-window)/N)
-    }
   }
+  step = ((nrow(exp)-window)/N)
   #use sliding window to compress expression values and pseudotime
   print(paste0("Window: ", window))
   print(paste0("Step: ", step))
@@ -147,21 +138,8 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   }
   else{
     print(paste0("Compressing lineage ", lineage, " and fitting curves"))
-    if(normalize == T){
     step = ((nrow(exp)-window)/N)
     exp.comp = pbapply(exp, 2, compress2, window = window, step = step)
-    }
-    else{
-      step = ((ncol(exp)-window)/N)
-      if(cores > 1){
-        print("multicore processing")
-        exp.comp = pbapply(exp, 1, compress2, window = window, step = step, cl = cl)
-      }
-      else{
-        exp.comp = pbapply(exp, 1, compress2, window = window, step = step)
-      }
-      exp.comp = round(t(exp.comp))
-    }
   }
   if(gene != F){
     exp_data.sel = cbind(pt.comp, exp.comp)
