@@ -145,7 +145,7 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
     print(paste0("Compressing lineage ", lineage, " and fitting curves"))
     exp.comp = pbapply(exp, 2, compress2, window = window, step = step)
   }
-  if(normalize = T){
+  if(normalize == T){
     exp.comp = round(exp.comp)
   }
   if(gene != F){
