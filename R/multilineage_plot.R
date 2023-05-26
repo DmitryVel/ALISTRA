@@ -123,14 +123,16 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   if(normalize == T){
     exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
   }
-  else{
-    exp = t(exp)
-  }
   pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
   pt = pt[order(pt)]
   exp = exp[names(pt),]
   if(window == FALSE){
-    window = nrow(exp)/N
+    if(normalize == T){
+      window = nrow(exp)/N
+    }
+    else{
+      window = ncol(exp)/N
+    }
   }
   step = ((nrow(exp)-window)/N)
   #use sliding window to compress expression values and pseudotime
@@ -143,10 +145,21 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   }
   else{
     print(paste0("Compressing lineage ", lineage, " and fitting curves"))
+    if(normalize == T){
+    step = ((nrow(exp)-window)/N)
     exp.comp = pbapply(exp, 2, compress2, window = window, step = step)
-  }
-  if(normalize == T){
-    exp.comp = round(exp.comp)
+    }
+    else{
+      step = ((ncol(exp)-window)/N)
+      if(cores != F){
+        cl <- makeCluster(cores)
+        exp.comp = pbapply(exp, 1, compress2, window = window, step = step, cl = cl)
+      }
+      else{
+        exp.comp = pbapply(exp, 1, compress2, window = window, step = step)
+      }
+      exp.comp = round(t(exp.comp))
+    }
   }
   if(gene != F){
     exp_data.sel = cbind(pt.comp, exp.comp)
