@@ -384,6 +384,25 @@ return(pt)
 }
 
 #' @export
+common <- function(df){
+  names(which.max(table(df)))
+}
+
+#' @export
+compress_meta <- function(meta, N){
+  window = nrow(meta)/N
+  step = ((nrow(meta)-window)/N)
+  cluster = meta$cluster
+  age = meta$age
+  cluster.comp = SlidingWindow(common, cluster, window, step)
+  age.comp = SlidingWindow(common, age, window, step)
+  meta.comp = cbind(age.comp, cluster.comp)
+  meta.comp = as.data.frame(meta.comp)
+  colnames(meta.comp) <- c("age", "cluster")
+  meta.comp
+}
+
+#' @export
 plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scale = T, scale.lineage = NULL, age.points = c("3rd trimester", "0-1 years", "2-4 years", "4-10 years"), breaks.labels = c("2nd", "3rd", "birth", "1y", "4y"), point_size = 0.1, line_size = 1, text.size = 14, plot.title.size = 36, legend.key.size = 0.5, legend.text.size = 10, colors = c("red", "blue", "green", "cyan", "magenta", "purple", "orange", "black", "yellow", "tan"), N = 500, legend_position = "none"){
   cds_name = deparse(substitute(cds))
   input = paste0(cds_name,"@expression$", lineages[1])
