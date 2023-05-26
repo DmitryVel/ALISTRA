@@ -92,10 +92,10 @@ compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F, nor
 compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE, normalize = T){
   cds_name = deparse(substitute(cds))
   if(gene == FALSE){
-    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, normalize = ", normalize, ", cores = ", cores, ")")
+    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, ", normalize = ", normalize, ", cores = ", cores, ")")
   }
   else{
-    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = '", gene, "', N = ", N, ", normalize = ", normalize, cores = ", cores, ")")
+    input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = '", gene, "', N = ", N, ", normalize = ", normalize, ", cores = ", cores, ")")
   }
   exp = eval(parse(text=input))
   input = paste0(cds_name, "@expression$", lineage, " <- exp$expression")
