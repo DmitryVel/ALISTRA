@@ -120,7 +120,7 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   model = "expression ~ splines::ns(pseudotime, df=3)"
   names(cds_subset) <- rowData(cds_subset)$gene_short_name
   exp = as_matrix(exprs(cds_subset))
-  if(normalize = T){
+  if(normalize == T){
     exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
   }
   else{
