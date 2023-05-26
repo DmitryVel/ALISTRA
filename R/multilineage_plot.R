@@ -78,7 +78,7 @@ compress2 <- function(df, window, step){
   df.comp = SlidingWindow("mean", df, window, step)
 }
 
-compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F){
+compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F, normalize = T){
   lineages = names(cds@lineages)
   for(lineage in lineages){
     print(lineage)
@@ -89,7 +89,7 @@ compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F){
 }
 
 #' @export
-compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE){
+compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE, normalize = T){
   cds_name = deparse(substitute(cds))
   if(gene == FALSE){
     input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, ", cores = ", cores, ")")
@@ -108,7 +108,7 @@ compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N
 }
 
 #' @export
-compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F){
+compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, normalize = T){
   cds_name = deparse(substitute(cds))
   if(cores != F){
     cl <- makeCluster(cores)
@@ -120,7 +120,12 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   model = "expression ~ splines::ns(pseudotime, df=3)"
   names(cds_subset) <- rowData(cds_subset)$gene_short_name
   exp = as_matrix(exprs(cds_subset))
-  exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
+  if(normalize = T){
+    exp = t(exp) /  pData(cds_subset)[, 'Size_Factor']
+  }
+  else{
+    exp = t(exp)
+  }
   pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
   pt = pt[order(pt)]
   exp = exp[names(pt),]
