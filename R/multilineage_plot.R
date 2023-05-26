@@ -182,6 +182,42 @@ return(cds)
 }
 
 #' @export
+compress_ATAC_expression <- function(cds, lineage, start, N = 500, cores = F){
+  cds_name = deparse(substitute(cds))
+  if(cores != F){
+    cl <- makeCluster(cores)
+    clusterEvalQ(cl, c(library(evobiR)))
+  }
+  input = paste0("get_lineage_object(",cds_name,", lineage = '", lineage, "', start = ", start, ")")
+  cds_subset = eval(parse(text=input))
+  family = stats::quasipoisson()
+  model = "expression ~ splines::ns(pseudotime, df=3)"
+  names(cds_subset) <- rowData(cds_subset)$gene_short_name
+  exp = as_matrix(exprs(cds_subset))
+  pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
+  pt = pt[order(pt)]
+  exp = exp[,names(pt)]
+  window = ncol(exp)/N
+  step = ((ncol(exp)-window)/N)
+  #use sliding window to compress expression values and pseudotime
+  print(paste0("Window: ", window))
+  print(paste0("Step: ", step))
+  pt.comp = SlidingWindow("mean", pt, window, step)
+  max.pt = max(pt.comp)
+  print(paste0("Compressing lineage ", lineage, " and fitting curves"))
+  step = ((ncol(exp)-window)/N)
+  if(cores > 1){
+    print("multicore processing")
+    exp.comp = pbapply(exp, 1, compress2, window = window, step = step, cl = cl)
+  }
+  else{
+    exp.comp = pbapply(exp, 1, compress2, window = window, step = step)
+  }
+  exp.comp = round(t(exp.comp))
+  return(list(exp.comp, pt.comp))
+}
+
+#' @export
 compress_lineage <- function(cds, lineage, start, gene = FALSE, N = 500, cores = F, cells = FALSE){
 cds_name = deparse(substitute(cds))
 if(gene == FALSE){
