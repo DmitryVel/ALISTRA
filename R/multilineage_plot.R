@@ -89,7 +89,7 @@ compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F){
 }
 
 #' @export
-compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE, normalize = T){
+compress_lineage_v2 <- function(cds, lineage, start, window = F, gene = FALSE, N = 500, cores = F, cells = FALSE){
   cds_name = deparse(substitute(cds))
   if(gene == FALSE){
     input = paste0("compress_expression_v2(",cds_name,", lineage = '", lineage, "', start = ", start, ", window = ", window, ", gene = ", gene, ", N = ", N, ", cores = ", cores, ")")
