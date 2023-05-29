@@ -258,7 +258,12 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   else{
     print(paste0("Compressing lineage ", lineage, " and fitting curves"))
     step = ((nrow(exp)-window)/N)
+    if(cores != F){
+    exp.comp = pbapply(exp, 2, compress2, window = window, step = step, cl = cl)
+    }
+    else{
     exp.comp = pbapply(exp, 2, compress2, window = window, step = step)
+    }
   }
   if(gene != F){
     exp_data.sel = cbind(pt.comp, exp.comp)
@@ -278,7 +283,12 @@ compress_expression_v2 <- function(cds, lineage, start, window = F, gene = FALSE
   }
   else{
     d = as.data.frame(seq(from=0, to=max.pt, by = max.pt/(N-1)))
+    if(cores != F){
+    fit = pbapply(exp.comp, 2, fit.m3, pt = d, max.pt = max(d), N = N, cl = cl)
+    }
+    else{
     fit = pbapply(exp.comp, 2, fit.m3, pt = d, max.pt = max(d), N = N)
+    }
     fit = apply(fit, 2, as.numeric)
     return(list("expression" = exp.comp, "expectation" = fit, "pseudotime" = d))
   }
