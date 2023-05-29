@@ -325,6 +325,7 @@ compress_ATAC_expression <- function(cds, lineage, start, N = 500, cores = F){
   max.pt = max(pt.comp)
   print(paste0("Compressing lineage ", lineage, " and fitting curves"))
   step = ((ncol(exp)-window)/N)
+  print("pulling counts into metacells")
   if(cores > 1){
     print("multicore processing")
     exp.comp = pbapply(exp, 1, pull, window = window, step = step, cl = cl)
