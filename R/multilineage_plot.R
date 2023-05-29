@@ -618,22 +618,22 @@ plot_multiple <- function(cds, gene, lineages, meta = NULL, points = T, age.scal
   else{
     q <- q + geom_line(aes(x = pseudotime, y = fit, color = lineage), size = I(line_size)) + scale_color_manual(values = colors)
   }
-  if(length(scale.lineage) == 1){
-  input = paste0(cds_name,"@lineages$", scale.lineage)
-  cells = eval(parse(text = input))
-  age = meta[cells,c("age_num", "age_range")]
-  }
-  else{
-  age = meta[,c("age_num", "age_range")]
-  }
-  age = age[order(age$age_num),]
-  window = nrow(age)/N
-  step = ((nrow(age)-window)/N)
-  age.comp = SlidingWindow("mean", age$age_num, window, step)
-  d = seq(from=0, to=max.pt, by = max.pt/(N-1))
-  d = cbind(as.data.frame(d), age.comp)
   q <- q + scale_y_log10()
   if(age.scale == T){
+    if(length(scale.lineage) == 1){
+    input = paste0(cds_name,"@lineages$", scale.lineage)
+    cells = eval(parse(text = input))
+    age = meta[cells,c("age_num", "age_range")]
+    }
+    else{
+    age = meta[,c("age_num", "age_range")]
+    }
+    age = age[order(age$age_num),]
+    window = nrow(age)/N
+    step = ((nrow(age)-window)/N)
+    age.comp = SlidingWindow("mean", age$age_num, window, step)
+    d = seq(from=0, to=max.pt, by = max.pt/(N-1))
+    d = cbind(as.data.frame(d), age.comp) 
     breaks.list = c(0)
     for(age.point in age.points){
       age.break = quantile(age[age$age_range == age.point,]$age_num, 0.95)
