@@ -301,7 +301,7 @@ return(cds)
 }
 
 #' @export
-compress_ATAC_expression <- function(cds, lineage, start, N = 500, cores = F){
+compress_ATAC_expression <- function(cds, lineage, start, genes = NULL, N = 500, cores = F){
   cds_name = deparse(substitute(cds))
   if(cores != F){
     cl <- makeCluster(cores)
@@ -313,6 +313,9 @@ compress_ATAC_expression <- function(cds, lineage, start, N = 500, cores = F){
   model = "expression ~ splines::ns(pseudotime, df=3)"
   names(cds_subset) <- rowData(cds_subset)$gene_short_name
   exp = as_matrix(exprs(cds_subset))
+  if(length(genes) > 0){
+    exp = exp[genes,]
+  }
   pt <- cds_subset@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
   pt = pt[order(pt)]
   exp = exp[,names(pt)]
