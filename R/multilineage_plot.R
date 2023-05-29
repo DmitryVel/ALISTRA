@@ -34,6 +34,119 @@ theme_opts <- function()
 }
 
 #' @export
+compress_UMAP <- function(cds, lineage, start, N = 2500){
+  cds_name = deparse(substitute(cds))
+  input = paste0("sel.cells = ",cds_name,"@lineages$", lineage)
+  eval(parse(text=input))
+  RNA_umap = reducedDims(cds)$"UMAP"[sel.cells,]
+  window = nrow(RNA_umap)/N
+  step = ((nrow(RNA_umap)-window)/N)
+  #use sliding window to compress expression values and pseudotime
+  print(paste0("Window: ", window))
+  print(paste0("Step: ", step))
+  umap_X = SlidingWindow("mean", RNA_umap[,1], window, step)
+  umap_Y = SlidingWindow("mean", RNA_umap[,2], window, step)
+  umap = as.data.frame(cbind(umap_X, umap_Y))
+  umap
+}
+
+#' @export
+common <- function(df){
+  names(which.max(table(df)))
+}
+
+compress_meta <- function(meta, N){
+  window = nrow(meta)/N
+  step = ((nrow(meta)-window)/N)
+  cluster = meta$cluster
+  age = meta$age
+  cluster.comp = SlidingWindow(common, cluster, window, step)
+  age.comp = SlidingWindow(common, age, window, step)
+  meta.comp = cbind(age.comp, cluster.comp)
+  meta.comp = as.data.frame(meta.comp)
+  colnames(meta.comp) <- c("age", "cluster")
+  meta.comp
+}
+
+#' @export
+isolate_lineage_ATAC <- function(cds, ATAC, lineage, sel_clusters = NULL, starting_clusters = NULL, subset = FALSE, N = 5, cl = 1){
+  cds_name = deparse(substitute(cds))
+  input = paste0("sub.graph = ",cds_name,"@graphs$", lineage)
+  eval(parse(text=input))
+  nodes_UMAP = cds@principal_graph_aux[["UMAP"]]$dp_mst
+  if(subset == F){
+    nodes_UMAP.sub = as.data.frame(t(nodes_UMAP[,names(V(sub.graph))]))
+  }
+  else{
+    g = principal_graph(cds)[["UMAP"]]
+    dd = degree(g)
+    names1 = names(dd[dd > 2 | dd == 1])
+    names2 = names(dd[dd == 2])
+    names2 = sample(names2, length(names2)/subset, replace = F)
+    names = c(names1, names2)
+    names = intersect(names(V(sub.graph)), names)
+    nodes_UMAP.sub = as.data.frame(t(nodes_UMAP[,names]))
+  }
+  #select cells along the graph
+  mean.dist = path.distance(nodes_UMAP.sub)
+  r = mean.dist*N
+  cells_UMAP = as.data.frame(ATAC.integrated[['UMAP']][[]])
+  colnames(cells_UMAP) = c("UMAP_1", "UMAP_2")
+  sel.cells = cell.selector(nodes_UMAP.sub, cells_UMAP, r, cl = cl)
+  #only keep cells in the progenitor and lineage-specific clusters
+  sel.cells1 = c()
+  sel.cells2 = sel.cells
+  if(length(starting_clusters) > 0){
+    sel.cells1 = names(Idents(ATAC.integrated)[Idents(ATAC.integrated) %in% starting_clusters])
+  }
+  if(length(sel_clusters) > 0){
+    sel.cells2 = names(Idents(ATAC.integrated)[Idents(ATAC.integrated) %in% sel_clusters])
+  }
+  cells = unique(c(sel.cells1, sel.cells2))
+  sel.cells = sel.cells[sel.cells %in% cells]
+  return(sel.cells)
+}
+
+#' @export
+import_ATAC <- function(cds_ref, ATAC_counts, UMAP, ATAC_meta, lineage){
+  cds_name = deparse(substitute(cds_ref))
+  input = paste0("sub.graph = ",cds_name,"@graphs$", lineage)
+  eval(parse(text=input))
+  nodes_UMAP = cds_ref@principal_graph_aux[["UMAP"]]$dp_mst
+  #create monocle object with ATAC counts or gene activity counts
+  gene_annotation = as.data.frame(rownames(ATAC_counts))
+  rownames(gene_annotation) = rownames(ATAC_counts)
+  colnames(gene_annotation) = 'gene_short_name'
+  cds = new_cell_data_set(ATAC_counts, cell_metadata = ATAC_meta, gene_metadata = gene_annotation)
+  reducedDims(cds)$"UMAP" <- UMAP
+  s.clusters = as.character(ATAC_meta$cluster)
+  names(s.clusters) <- rownames(ATAC_meta)
+  cds@clusters$"UMAP"$"clusters" <- s.clusters
+  cds@clusters$UMAP$partitions <- cds@clusters$UMAP$clusters
+  cds@clusters$UMAP$partitions[cds@clusters$UMAP$partitions != "1"] <- "1"
+  principal_graph(cds)[["UMAP"]] <- sub.graph
+  cds@principal_graph_aux[["UMAP"]]$dp_mst <- nodes_UMAP[,names(V(sub.graph))]
+  cds = import_monocle(cds)
+  ref.umap = reducedDims(cds_ref)$"UMAP"
+  atac.umap = reducedDims(cds)$"UMAP"
+  n_neighbors = 10
+  nn <- get.knnx(ref.umap, atac.umap, k=n_neighbors)
+  pt <- cds_ref@principal_graph_aux@listData[["UMAP"]][["pseudotime"]]
+  pt_atac = apply(nn$"nn.index", 1, function(x) mean(pt[x]))
+  cds@principal_graph_aux@listData[["UMAP"]][["pseudotime"]] <- pt_atac
+  cds@principal_graph_aux[["UMAP"]]$pseudotime <- pt_atac
+  names(cds@principal_graph_aux[["UMAP"]]$pseudotime) <- row.names(colData(cds))
+  sel.cells = colnames(ATAC_counts)
+  cds_name = "cds"
+  input = paste0(cds_name, "@graphs$", lineage, " <- sub.graph")
+  eval(parse(text=input))
+  input = paste0(cds_name, "@lineages$", lineage, " <- sel.cells")
+  eval(parse(text=input))
+  cds
+}
+
+
+#' @export
 compress <- function(df, window = 3, step){
 df.comp = SlidingWindow("mean", df, window, step)
 }
@@ -78,6 +191,12 @@ compress2 <- function(df, window, step){
   df.comp = SlidingWindow("mean", df, window, step)
 }
 
+#' @export
+pull <- function(df, window, step){
+  df.comp = SlidingWindow("sum", df, window, step)
+}
+
+#' @export
 compress_lineages_v2 <- function(cds, start, window = F, N = 500, cores = F){
   lineages = names(cds@lineages)
   for(lineage in lineages){
@@ -208,10 +327,10 @@ compress_ATAC_expression <- function(cds, lineage, start, N = 500, cores = F){
   step = ((ncol(exp)-window)/N)
   if(cores > 1){
     print("multicore processing")
-    exp.comp = pbapply(exp, 1, compress2, window = window, step = step, cl = cl)
+    exp.comp = pbapply(exp, 1, pull, window = window, step = step, cl = cl)
   }
   else{
-    exp.comp = pbapply(exp, 1, compress2, window = window, step = step)
+    exp.comp = pbapply(exp, 1, pull, window = window, step = step)
   }
   exp.comp = round(t(exp.comp))
   return(list(exp.comp, pt.comp))
