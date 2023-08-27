@@ -69,7 +69,7 @@ compress_meta <- function(meta, N){
 }
 
 #' @export
-isolate_lineage_ATAC <- function(cds, ATAC, lineage, sel_clusters = NULL, starting_clusters = NULL, subset = FALSE, N = 5, cl = 1){
+isolate_lineage_ATAC <- function(cds, ATAC.integrated, lineage, sel_clusters = NULL, starting_clusters = NULL, subset = FALSE, N = 5, cl = 1){
   cds_name = deparse(substitute(cds))
   input = paste0("sub.graph = ",cds_name,"@graphs$", lineage)
   eval(parse(text=input))
